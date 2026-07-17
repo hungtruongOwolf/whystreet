@@ -5,8 +5,18 @@
 > **live-sourced causal chain** - every claim carries a real news URL, and the
 > causality accumulates into a growing **Neo4j knowledge graph**.
 
-Built for **HackWithSeattle 2.0** - *Building Grounded Agentic Applications with
-RocketRide Cloud & Linkup*.
+Built for **[HackWithSeattle 2.0](https://luma.com/6u7f4gen?tk=WgHmpn)** - *Building
+Grounded Agentic Applications with RocketRide Cloud & Linkup*.
+
+---
+
+## Demo
+
+> **Video walkthrough:** _add link here_ (YouTube / Loom / MP4)
+
+<!-- Replace the line above with the embed/link, e.g.:
+[![WhyStreet demo](docs/images/demo-thumbnail.png)](https://your-video-link)
+-->
 
 ---
 
@@ -163,6 +173,13 @@ flowchart LR
     B2 --> RESP
     B3 --> RESP
 ```
+
+The same pipeline as built on the RocketRide Cloud canvas:
+
+![WhyStreet pipeline on RocketRide Cloud](docs/images/rocketride-pipeline.png)
+
+<!-- Save your RocketRide editor screenshot as docs/images/rocketride-pipeline.png -->
+
 
 ### What we specifically leverage
 
