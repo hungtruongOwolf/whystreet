@@ -580,6 +580,25 @@ async def linkup_via_rocketride(ticker: str, date: str, move: str):
     return None
 
 
+async def keepalive():
+    """Ping RocketRide every few minutes so the websocket doesn't idle-drop
+    (which otherwise forces a reconnect + delay on the next analyze)."""
+    while True:
+        await asyncio.sleep(180)
+        try:
+            async with state["lock"]:
+                c = state.get("client")
+                tok = state.get("token")
+                if c and tok:
+                    await c.get_task_status(tok)
+        except Exception as e:
+            print("keepalive failed, reconnecting:", e)
+            try:
+                await reconnect()
+            except Exception:
+                pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Never let a transient dependency (DB or a flaky RocketRide Cloud) crash boot —
@@ -607,7 +626,9 @@ async def lifespan(app: FastAPI):
         state["client"] = None
         state["token"] = None
         state["linkup_token"] = None
+    ka = asyncio.create_task(keepalive())
     yield
+    ka.cancel()
     client = state.get("client")
     if client:
         for tk in (state.get("token"), state.get("linkup_token")):
