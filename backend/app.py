@@ -582,26 +582,44 @@ async def linkup_via_rocketride(ticker: str, date: str, move: str):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    client = RocketRideClient()
-    await client.connect()
-    state["client"] = client
-    state["token"] = await start_pipe(client, PIPE)
-    print("WhyStreet reasoning pipeline ready:", state["token"])
+    # Never let a transient dependency (DB or a flaky RocketRide Cloud) crash boot —
+    # the service must come up so /api/health passes and the frontend can load.
+    # RocketRide connects here if possible, else lazily on the first request
+    # (pipe_chat -> reconnect self-heals).
     try:
-        state["linkup_token"] = await start_pipe(client, LINKUP_PIPE)
-        print("WhyStreet Linkup pipeline ready:", state["linkup_token"])
+        init_db()
     except Exception as e:
-        print("Linkup pipeline unavailable (will use direct fallback):", e)
+        print("init_db failed at startup (continuing):", e)
+    try:
+        client = RocketRideClient()
+        await client.connect()
+        state["client"] = client
+        state["token"] = await start_pipe(client, PIPE)
+        print("WhyStreet reasoning pipeline ready:", state["token"])
+        try:
+            state["linkup_token"] = await start_pipe(client, LINKUP_PIPE)
+            print("WhyStreet Linkup pipeline ready:", state["linkup_token"])
+        except Exception as e:
+            print("Linkup pipeline unavailable (will use direct fallback):", e)
+            state["linkup_token"] = None
+    except Exception as e:
+        print("RocketRide startup failed (will connect on first request):", e)
+        state["client"] = None
+        state["token"] = None
         state["linkup_token"] = None
     yield
-    for tk in (state.get("token"), state.get("linkup_token")):
+    client = state.get("client")
+    if client:
+        for tk in (state.get("token"), state.get("linkup_token")):
+            try:
+                if tk:
+                    await client.terminate(tk)
+            except Exception:
+                pass
         try:
-            if tk:
-                await client.terminate(tk)
+            await client.disconnect()
         except Exception:
             pass
-    await client.disconnect()
 
 
 app = FastAPI(title="WhyStreet API", lifespan=lifespan)
