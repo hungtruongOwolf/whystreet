@@ -83,13 +83,8 @@ export default function App() {
             <p className="tag">The why behind Wall Street</p>
           </div>
         </div>
-        <nav className="topnav">
-          <button className={view === 'explorer' ? 'active' : ''} onClick={() => setView('explorer')}><LineChart size={16} /> Explorer</button>
-          <button className={view === 'kg' ? 'active' : ''} onClick={() => setView('kg')}><Network size={16} /> Knowledge Graph</button>
-          <button className={view === 'portfolio' ? 'active' : ''} onClick={() => setView('portfolio')}><Wallet size={16} /> Portfolio</button>
-        </nav>
         {view === 'explorer' && (
-          <select value={ticker} onChange={(e) => setTicker(e.target.value)} className="ticker-select">
+          <select value={ticker} onChange={(e) => setTicker(e.target.value)} className="ticker-select header-center">
             {stocks.map((s) => (
               <option key={s.ticker} value={s.ticker}>
                 {s.ticker} — {s.company_name}
@@ -97,6 +92,11 @@ export default function App() {
             ))}
           </select>
         )}
+        <nav className="topnav">
+          <button className={view === 'explorer' ? 'active' : ''} onClick={() => setView('explorer')}><LineChart size={16} /> Explorer</button>
+          <button className={view === 'kg' ? 'active' : ''} onClick={() => setView('kg')}><Network size={16} /> Knowledge Graph</button>
+          <button className={view === 'portfolio' ? 'active' : ''} onClick={() => setView('portfolio')}><Wallet size={16} /> Portfolio</button>
+        </nav>
       </header>
 
       {error && <div className="error">⚠ {error}</div>}

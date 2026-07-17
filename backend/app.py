@@ -53,13 +53,126 @@ PIPE = str(ROOT / "pipeline" / "whystreet.pipe")
 LINKUP_PIPE = str(ROOT / "pipeline" / "whystreet-linkup.pipe")
 SOURCE_ID = "chat_1"
 LINKUP_KEY = os.environ["ROCKETRIDE_LINKUP_KEY"]
+NEO4J_URI = os.getenv("ROCKETRIDE_NEO4J_URI")
+NEO4J_USER = os.getenv("ROCKETRIDE_NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("ROCKETRIDE_NEO4J_PASSWORD")
 
-state: dict = {"client": None, "token": None, "linkup_token": None, "lock": asyncio.Lock()}
+state: dict = {"client": None, "token": None, "linkup_token": None,
+               "neo4j": None, "lock": asyncio.Lock()}
 
 
 # ---------- Supabase (direct Postgres; Zscaler-safe) ----------
 def pg():
     return psycopg2.connect(os.environ["SUPABASE_DB_URL"], connect_timeout=10)
+
+
+# ---------- Neo4j (the causal knowledge graph lives here) ----------
+# The cumulative causal graph is a real graph DB: (:Event|:Entity|:Sector|:Stock)
+# nodes joined by [:CAUSES] edges. The RocketRide pipeline reads it via the
+# db_neo4j graph-RAG node (NL -> Cypher) to ground each new analysis in prior
+# accumulated causality; the backend writes new nodes/edges here after each run.
+def neo4j_driver():
+    if not (NEO4J_URI and NEO4J_PASSWORD):
+        return None
+    if state.get("neo4j") is None:
+        from neo4j import GraphDatabase
+        state["neo4j"] = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    return state["neo4j"]
+
+
+def _node_label(typ: str) -> str:
+    return {"event": "Event", "entity": "Entity", "sector": "Sector",
+            "stock": "Stock"}.get((typ or "event").lower(), "Event")
+
+
+def kg_upsert_neo4j(ticker: str, date: str, graph: dict) -> None:
+    """MERGE this analysis's causal nodes/edges into Neo4j. Best-effort — the
+    Supabase mirror (kg_upsert) is authoritative if Aura is not configured."""
+    drv = neo4j_driver()
+    if not drv:
+        return
+    nodes = graph.get("nodes", []) or []
+    edges = graph.get("edges", []) or []
+    idmap = {}
+    for n in nodes:
+        typ = (n.get("type") or "event").lower()
+        label = ticker if typ == "stock" else (n.get("label") or n.get("id") or "").strip()
+        if label:
+            idmap[n.get("id")] = (label[:120], typ, n.get("source_url"))
+    with drv.session() as ses:
+        for label, typ, src in idmap.values():
+            ses.run(
+                f"MERGE (n:KG {{name:$label}}) "
+                f"SET n:{_node_label(typ)}, n.type=$typ, n.weight=coalesce(n.weight,0)+1, "
+                f"n.source_url=coalesce($src, n.source_url), "
+                f"n.event_date = CASE WHEN $date > coalesce(n.event_date,'') THEN $date ELSE n.event_date END, "
+                f"n.updated_at=timestamp()",
+                label=label, typ=typ, src=src, date=date)
+        for e in edges:
+            f = idmap.get(e.get("from"))
+            t = idmap.get(e.get("to"))
+            if not f or not t or f[0] == t[0]:
+                continue
+            ses.run(
+                "MATCH (a:KG {name:$f}), (b:KG {name:$t}) "
+                "MERGE (a)-[r:CAUSES {tier:$tier}]->(b) "
+                "SET r.direction=$dir, r.confidence=$conf, "
+                "r.source_url=coalesce($src, r.source_url), "
+                "r.weight=coalesce(r.weight,0)+1, r.updated_at=timestamp()",
+                f=f[0], t=t[0], tier=(e.get("tier") or "indirect"),
+                dir=e.get("direction"), conf=e.get("confidence") or 0.5,
+                src=e.get("source_url"))
+
+
+def kg_read_neo4j() -> dict | None:
+    """Read the whole cumulative graph from Neo4j (for /api/kg). None if unavailable."""
+    drv = neo4j_driver()
+    if not drv:
+        return None
+    try:
+        with drv.session() as ses:
+            nrows = ses.run(
+                "MATCH (n:KG) RETURN n.name AS label, n.type AS type, "
+                "n.weight AS weight, n.source_url AS source_url, n.event_date AS date").data()
+            erows = ses.run(
+                "MATCH (a:KG)-[r:CAUSES]->(b:KG) RETURN a.name AS f, b.name AS t, "
+                "r.tier AS tier, r.direction AS direction, r.confidence AS confidence, "
+                "r.source_url AS source_url, r.weight AS weight").data()
+        nodes = [{"id": r["label"], "label": r["label"], "type": r["type"],
+                  "weight": r["weight"] or 1, "source_url": r["source_url"], "date": r["date"]}
+                 for r in nrows]
+        edges = [{"from": r["f"], "to": r["t"], "tier": r["tier"], "direction": r["direction"],
+                  "confidence": float(r["confidence"] or 0.5), "source_url": r["source_url"],
+                  "weight": r["weight"] or 1} for r in erows]
+        return {"nodes": nodes, "edges": edges}
+    except Exception as e:
+        print("neo4j read failed, falling back to Supabase:", e)
+        return None
+
+
+def neo4j_priors(ticker: str, limit: int = 12) -> str:
+    """Graph-RAG READ: multi-hop Cypher over the accumulated causal graph — what
+    has historically driven THIS ticker. Returns a compact text block to ground
+    the new analysis in prior causality (empty string if none / unavailable)."""
+    drv = neo4j_driver()
+    if not drv:
+        return ""
+    try:
+        with drv.session() as ses:
+            rows = ses.run(
+                "MATCH (cause:KG)-[:CAUSES*1..3]->(s:Stock {name:$ticker}) "
+                "WHERE cause.name <> $ticker "
+                "RETURN DISTINCT cause.name AS name, cause.type AS type, "
+                "cause.event_date AS date ORDER BY date DESC LIMIT $limit",
+                ticker=ticker, limit=limit).data()
+        if not rows:
+            return ""
+        lines = [f"- {r['name']} ({r['type']}{', ' + r['date'] if r.get('date') else ''})"
+                 for r in rows]
+        return "\n".join(lines)
+    except Exception as e:
+        print("neo4j_priors failed:", e)
+        return ""
 
 
 def init_db() -> None:
@@ -247,8 +360,19 @@ def build_evidence_message(ticker: str, date: str, move: str, ev: dict, vol: flo
                 f"Judge the {move} move relative to that.\n" if vol else "")
     trig = ev.get("answer_trigger", "") or ev.get("answer", "")
     build = ev.get("answer_buildup", "")
+    # Graph-RAG grounding is OFF by default: with a weak free model it can bleed a
+    # prior event into the current summary. Flip GRAPHRAG_PRIORS=on to A/B it once
+    # a strong model / stable RocketRide is available. The Neo4j graph store,
+    # /api/kg, and multi-hop queries are unaffected and always on.
+    priors = neo4j_priors(ticker) if os.getenv("GRAPHRAG_PRIORS", "off").lower() == "on" else ""
+    priors_block = (
+        f"\n\n---\nKNOWN RELATED ENTITIES from the Neo4j causal graph (past drivers of {ticker} "
+        f"in EARLIER, unrelated analyses). These are NOT the cause of the {date} move and MUST "
+        f"NOT be described or summarized. Use them ONLY to keep entity/sector NAMES consistent "
+        f"if the SAME driver genuinely appears in the live evidence above:\n{priors}"
+        if priors else "")
     return (
-        f"STOCK: {ticker}\nDATE OF MOVE: {date}\nMOVE: {move}\n{vol_line}\n"
+        f"ANALYZE THIS MOVE — and ONLY this move: {ticker} on {date}, {move}.\n{vol_line}\n"
         f"EVIDENCE (retrieved live from Linkup — use ONLY this, never outside knowledge).\n"
         f"News explaining a move is NOT confined to the move's own day: the TRIGGER can land "
         f"a day or two before, and the ROOT CAUSE often builds over the prior weeks. Two "
@@ -257,6 +381,7 @@ def build_evidence_message(ticker: str, date: str, move: str, ev: dict, vol: flo
         f"— PROXIMATE TRIGGER (around {date}):\n{trig}\n\n"
         f"— EARLIER BUILD-UP (weeks before {date}):\n{build or '(none surfaced)'}\n\n"
         f"SOURCES (each tagged [trigger] or [buildup]):\n{src_lines}"
+        f"{priors_block}"
     )
 
 
@@ -497,7 +622,11 @@ async def health():
 
 @app.get("/api/kg")
 async def knowledge_graph():
-    """The cumulative knowledge graph across every analysis run so far."""
+    """The cumulative causal knowledge graph across every analysis run. Served
+    from Neo4j (the real graph DB) when configured; Supabase mirror otherwise."""
+    g = kg_read_neo4j()
+    if g is not None:
+        return g
     conn = pg()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("select label, type, weight, source_url, event_date from kg_nodes")
@@ -553,6 +682,10 @@ async def analyze(req: AnalyzeReq):
     save_cache(req.ticker, req.date, data)
     try:
         kg_upsert(req.ticker, req.date, data.get("graph", {}))
+        try:
+            kg_upsert_neo4j(req.ticker, req.date, data.get("graph", {}))
+        except Exception as e:
+            print("kg_upsert_neo4j failed:", e)
     except Exception as e:
         print("kg_upsert failed:", e)
     return {"cached": False, **data}

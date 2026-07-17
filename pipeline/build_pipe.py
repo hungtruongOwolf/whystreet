@@ -32,6 +32,32 @@ LLM = {
     "parameters": {},
 }
 
+# Graph-RAG node: reads the CUMULATIVE causal knowledge graph in Neo4j via
+# LLM-generated Cypher, so each new analysis is grounded in prior accumulated
+# causality (multi-hop: which earlier events / sectors already link to this stock).
+NEO4J_DB_DESC = (
+    "A causal knowledge graph of stock price moves. Nodes carry label :KG plus one of "
+    ":Event/:Entity/:Sector/:Stock, with properties {name, type, event_date, source_url, weight}. "
+    "Stock nodes have name = the ticker (e.g. 'NVDA'). Relationships are "
+    "(:KG)-[:CAUSES {tier, direction, confidence}]->(:KG), pointing cause -> effect. "
+    "To find what has historically driven a ticker, match paths ending at the Stock node, e.g. "
+    "MATCH p=(cause:KG)-[:CAUSES*1..3]->(s:Stock {name:$ticker}) RETURN p. "
+    "Only use the STOCK ticker from the input to query; ignore the rest of the message."
+)
+DB_NEO4J = {
+    "profile": "default",
+    "default": {
+        "uri": "${ROCKETRIDE_NEO4J_URI}",
+        "auth_method": "userpass",
+        "user": "${ROCKETRIDE_NEO4J_USER}",
+        "password": "${ROCKETRIDE_NEO4J_PASSWORD}",
+        "database": "neo4j",
+        "db_description": NEO4J_DB_DESC,
+        "allow_execute": False,
+    },
+    "parameters": {},
+}
+
 BRANCHES = {
     "graph": [
         "You are the CAUSAL-CHAIN branch of WhyStreet. From the Linkup evidence, lay out the chain of "
@@ -88,7 +114,12 @@ def branch_nodes(name, y):
         {
             "id": prompt_id,
             "provider": "prompt",
-            "config": {"instructions": BRANCHES[name], "parameters": {}},
+            "config": {"instructions": BRANCHES[name] + [
+                "PRIOR-GRAPH context (retrieved from the Neo4j causal knowledge graph of past "
+                "moves for this ticker) may be provided as additional context. When present, use "
+                "it to connect this move to previously-seen related events/sectors and to reuse "
+                "consistent entity names — but ground every claim in the live Linkup evidence."],
+                "parameters": {}},
             "input": [{"lane": "questions", "from": "chat_1"}],
             "ui": {"position": {"x": 240, "y": y}, "measured": {"width": 150, "height": 66}, "nodeType": "default"},
         },
@@ -110,6 +141,10 @@ components = [
         "ui": {"position": {"x": 20, "y": 200}, "measured": {"width": 150, "height": 66}, "nodeType": "default"},
     },
 ]
+# NOTE: RocketRide's server-side db_neo4j node is currently broken
+# (QuestionType.DIALECT AttributeError in their IInstance.py) — so the graph-RAG
+# READ is issued by the backend via the Neo4j driver and injected into the
+# evidence message instead. The causal graph still lives in Neo4j (write + /api/kg).
 for i, name in enumerate(["graph", "reasons", "similar"]):
     components += branch_nodes(name, 80 + i * 170)
 

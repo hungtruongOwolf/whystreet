@@ -12,6 +12,13 @@
   padding: 14px 22px;
   border-bottom: 1px solid #1c2128;
   background: #0e1116;
+  position: relative;
+}
+/* Explorer's stock dropdown sits dead-center; brand stays left, nav stays right */
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .logo {
