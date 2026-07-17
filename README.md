@@ -12,11 +12,7 @@ Grounded Agentic Applications with RocketRide Cloud & Linkup*.
 
 ## Demo
 
-> **Video walkthrough:** _add link here_ (YouTube / Loom / MP4)
-
-<!-- Replace the line above with the embed/link, e.g.:
-[![WhyStreet demo](docs/images/demo-thumbnail.png)](https://your-video-link)
--->
+▶️ **[Watch the demo video](docs/demo.mp4)** - full walkthrough of WhyStreet (click to play on GitHub).
 
 ---
 
