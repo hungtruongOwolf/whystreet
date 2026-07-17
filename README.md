@@ -195,7 +195,13 @@ The same pipeline as built on the RocketRide Cloud canvas:
 
 RocketRide can host **both** as native pipeline nodes - Linkup via
 `tool_http_request`, and the causal graph via the `db_neo4j` node
-(natural-language → Cypher). We prototyped both. In the **production path**,
+(natural-language → Cypher). We prototyped both - here is our second pipeline,
+`whystreet-linkup.pipe`, where a RocketRide **wave agent** calls Linkup through
+the `HTTP Request` tool (with `LLM` + internal `Memory`):
+
+![WhyStreet Linkup-agent pipeline on RocketRide Cloud](docs/images/rocketride-linkup-pipeline.png)
+
+In the **production path**,
 Linkup retrieval and Neo4j graph-RAG are orchestrated by the backend *around*
 RocketRide's reasoning core, which gives us deterministic 2-layer retrieval,
 strict source validation, and fast, reliable graph I/O. The result is a clean
