@@ -1,0 +1,46 @@
+# Render Blueprint for the WhyStreet backend (FastAPI).
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+# Render reads this file, creates the service, then prompts you for each
+# secret env var below (sync:false = you enter it in the dashboard, never in git).
+services:
+  - type: web
+    name: whystreet-backend
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      # --- RocketRide ---
+      - key: ROCKETRIDE_URI
+        sync: false
+      - key: ROCKETRIDE_APIKEY
+        sync: false
+      - key: ROCKETRIDE_AUTH
+        sync: false
+      - key: ROCKETRIDE_LINKUP_KEY
+        sync: false
+      # --- LLM (Gemini via OpenAI-compatible endpoint) ---
+      - key: ROCKETRIDE_LLM_KEY
+        sync: false
+      - key: ROCKETRIDE_LLM_BASE_URL
+        sync: false
+      - key: ROCKETRIDE_LLM_MODEL
+        sync: false
+      # --- Supabase (direct Postgres) ---
+      - key: SUPABASE_DB_URL
+        sync: false
+      # --- Neo4j Aura (causal knowledge graph) ---
+      - key: ROCKETRIDE_NEO4J_URI
+        sync: false
+      - key: ROCKETRIDE_NEO4J_USER
+        sync: false
+      - key: ROCKETRIDE_NEO4J_PASSWORD
+        sync: false
+      # --- Graph-RAG grounding toggle ---
+      - key: GRAPHRAG_PRIORS
+        value: "on"
