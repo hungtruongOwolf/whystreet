@@ -14,6 +14,10 @@ Grounded Agentic Applications with RocketRide Cloud & Linkup*.
 
 ▶️ **[Watch the demo video](https://github.com/hungtruongOwolf/whystreet/raw/main/docs/demo.mp4)** - full walkthrough of WhyStreet.
 
+
+https://github.com/user-attachments/assets/e5c87660-38fa-4ad4-ad5f-9f7230161f11
+
+
 ---
 
 ## 1. The problem - information overload
