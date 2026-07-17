@@ -4,12 +4,13 @@ import PriceChart from './components/PriceChart'
 import AnalysisModal from './components/AnalysisModal'
 import KnowledgeGraphView from './components/KnowledgeGraphView'
 import PortfolioTab from './components/PortfolioTab'
+import Landing from './components/Landing'
 import { getStocks, getPriceBars, getAnomalies } from './lib/api'
 import { analyzeMove } from './lib/analyze'
 import './App.css'
 
 export default function App() {
-  const [view, setView] = useState('explorer')
+  const [view, setView] = useState('landing')
   const [stocks, setStocks] = useState([])
   const [ticker, setTicker] = useState('NVDA')
   const [bars, setBars] = useState([])
@@ -73,10 +74,14 @@ export default function App() {
     }
   }
 
+  if (view === 'landing') {
+    return <Landing onEnter={() => setView('explorer')} onGoto={setView} />
+  }
+
   return (
     <div className="app">
       <header className="header">
-        <div className="brand">
+        <div className="brand" onClick={() => setView('landing')} role="button" title="Home">
           <span className="logo"><Activity size={22} strokeWidth={2.5} /></span>
           <div>
             <h1>WhyStreet</h1>
