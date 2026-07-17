@@ -256,9 +256,25 @@ erDiagram
     stocks ||--o{ price_bars : has
     stocks ||--o{ anomaly_points : has
     stocks ||--o{ analysis_results : has
-    price_bars { date date; float close; int volume }
-    anomaly_points { date date; float return_pct; float zscore }
-    analysis_results { date date; text summary; text explanation; jsonb graph; jsonb scores; jsonb similar_events; text_array sources }
+    price_bars {
+        date date
+        float close
+        int volume
+    }
+    anomaly_points {
+        date date
+        float return_pct
+        float zscore
+    }
+    analysis_results {
+        date date
+        text summary
+        text explanation
+        jsonb graph
+        jsonb scores
+        jsonb similar_events
+        text_array sources
+    }
 ```
 
 Plus **Neo4j**: `(:KG)` nodes + `[:CAUSES]` relationships (the cumulative graph).
@@ -334,21 +350,3 @@ flowchart LR
 - **Proactive alerts** - "your stock just moved, and here is the sourced causal chain" pushed to the user the moment it happens.
 - **Deeper on RocketRide** - move Linkup and the graph fully *inside* the pipeline (agent + `tool_http_request` + `db_neo4j`), add a wave-planning agent and vector memory (`qdrant`) for semantic "similar events", and stream RocketRide's per-node traces to show the reasoning live.
 - **Scale** - expand the universe well beyond 12 tickers and support intraday moves.
-
----
-
-## 14. Design principles
-
-- **Grounded, not generated** - no claim survives without a live Linkup source URL.
-- **Deterministic where it matters** - detection is math; the graph is assembled in code from an LLM chain, so it's always well-formed.
-- **Causality is temporal** - retrieval spans the weeks *before* a move, not just the day of.
-- **Knowledge compounds** - every analysis makes the next one smarter via the graph.
-
----
-
-## 15. Honest status
-
-- Analyses run live end-to-end (Linkup -> RocketRide -> Neo4j) and are cached.
-- Graph-RAG grounding is gated (`GRAPHRAG_PRIORS`) because a weak free model can bleed a prior event into an unrelated summary; a quarantine + reorder fix keeps it accurate.
-- RocketRide Cloud can be intermittently slow under load; the backend auto-reconnects and retries.
-- Secrets live only in `.env` (git-ignored). Rotate any shared keys after the event.
