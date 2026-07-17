@@ -1,20 +1,20 @@
-# WhyStreet — The Why Behind Wall Street
+# WhyStreet - The Why Behind Wall Street
 
 > A grounded, agentic explainer for stock price moves. WhyStreet detects sharp
 > volatility points on a chart, then explains **why** each one happened as a
-> **live-sourced causal chain** — every claim carries a real news URL, and the
+> **live-sourced causal chain** - every claim carries a real news URL, and the
 > causality accumulates into a growing **Neo4j knowledge graph**.
 
-Built for **HackWithSeattle 2.0** — *Building Grounded Agentic Applications with
+Built for **HackWithSeattle 2.0** - *Building Grounded Agentic Applications with
 RocketRide Cloud & Linkup*.
 
 ---
 
-## 1. The problem — information overload
+## 1. The problem - information overload
 
 Every new investor hits the same wall: **there is too much to know, and no way to
 tell what actually matters.** Thousands of headlines a day, endless tickers,
-macro noise, sector rotations, analyst takes — it is *information poisoning*. You
+macro noise, sector rotations, analyst takes - it is *information poisoning*. You
 open the app, see red or green, and have no idea what is real signal versus noise.
 
 This is personal. I held stocks that would **suddenly drop, or suddenly spike**,
@@ -24,7 +24,7 @@ and I couldn't tell what was going on:
 - Was it just **that sector** rotating?
 - Or was it something specific to **that one company**?
 
-I was effectively **blind** — watching my portfolio move and unable to answer the
+I was effectively **blind** - watching my portfolio move and unable to answer the
 one question that matters: *what happened, and why?* Googling gives you fifty
 articles, mostly recycled, rarely tied to the exact day, and never the causal
 chain behind the move. That blindness is why WhyStreet exists.
@@ -33,11 +33,11 @@ chain behind the move. That blindness is why WhyStreet exists.
 
 WhyStreet turns that flood into **one clear, trustworthy answer per move**:
 
-1. **Cuts the noise** — a math detector flags only statistically significant moves, so you look at the ~15 events that matter per stock, not thousands of headlines.
-2. **Retrieves only what's relevant** — for a given move it pulls news **from that time window only**, not the whole internet.
-3. **Explains it like an analyst** — a causal chain (root cause → sector → the stock) plus a plain-language *why it moved the price and market psychology* write-up.
-4. **Earns trust** — every claim links to a real source URL you can open and verify.
-5. **Compounds understanding** — each answer joins a knowledge graph, so you start to *see* the recurring drivers behind your whole portfolio instead of one-off panics.
+1. **Cuts the noise** - a math detector flags only statistically significant moves, so you look at the ~15 events that matter per stock, not thousands of headlines.
+2. **Retrieves only what's relevant** - for a given move it pulls news **from that time window only**, not the whole internet.
+3. **Explains it like an analyst** - a causal chain (root cause → sector → the stock) plus a plain-language *why it moved the price and market psychology* write-up.
+4. **Earns trust** - every claim links to a real source URL you can open and verify.
+5. **Compounds understanding** - each answer joins a knowledge graph, so you start to *see* the recurring drivers behind your whole portfolio instead of one-off panics.
 
 A beginner stops drowning and starts understanding.
 
@@ -48,8 +48,8 @@ A beginner stops drowning and starts understanding.
 - **Detects** significant price moves with a Bollinger-breakout detector (pure math, no LLM).
 - **Grounds** each move in live news via **Linkup**, using a two-layer *market-analyst* retrieval (proximate trigger + earlier build-up).
 - **Reasons** over that evidence on a **RocketRide Cloud** pipeline (3 parallel branches): a causal-chain graph, cited drivers with confidence, risk/recovery/signal scores, a *market-psychology* explanation, and analogous past events.
-- **Remembers** — every analysis is merged into a **Neo4j causal knowledge graph** that grows and cross-links stocks through shared events/sectors, and grounds future analyses (graph-RAG).
-- **Verifies** — every reason/edge/node URL must be one Linkup actually returned; hallucinated links are dropped.
+- **Remembers** - every analysis is merged into a **Neo4j causal knowledge graph** that grows and cross-links stocks through shared events/sectors, and grounds future analyses (graph-RAG).
+- **Verifies** - every reason/edge/node URL must be one Linkup actually returned; hallucinated links are dropped.
 
 Three views: **Explorer** (chart + analysis), **Knowledge Graph** (the growing web), **Portfolio** (holdings + "why did my stock move?").
 
@@ -142,7 +142,7 @@ and live per-node traces. That is exactly the muscle a grounded analyst app need
 
 ### The deployed reasoning pipeline
 
-RocketRide is the reasoning brain — **not** a single LLM call. The deployed
+RocketRide is the reasoning brain - **not** a single LLM call. The deployed
 `whystreet.pipe` fans one evidence message into **three concurrent branches** and
 merges them:
 
@@ -168,15 +168,15 @@ flowchart LR
 
 | RocketRide strength | How WhyStreet uses it |
 | --- | --- |
-| **Parallel multi-node DAG** | Three focused reasoning branches run concurrently on one evidence message, then merge — far richer than a single prompt, and faster than running them in series. |
-| **Provider-agnostic LLM connector** | The model is env-driven (`${ROCKETRIDE_LLM_*}`) — we swap providers by changing 3 lines; currently Gemini 3.1 Flash-Lite over the OpenAI-compatible endpoint. |
+| **Parallel multi-node DAG** | Three focused reasoning branches run concurrently on one evidence message, then merge - far richer than a single prompt, and faster than running them in series. |
+| **Provider-agnostic LLM connector** | The model is env-driven (`${ROCKETRIDE_LLM_*}`) - we swap providers by changing 3 lines; currently Gemini 3.1 Flash-Lite over the OpenAI-compatible endpoint. |
 | **Always-on deployed task** | The pipeline is started once and its token reused across every request (starting per-request is expensive); the backend auto-reconnects if a socket drops. |
-| **Control-plane (tools / DB / memory as native nodes)** | We built a second pipeline, `whystreet-linkup.pipe`, where a RocketRide **agent** calls Linkup through the `tool_http_request` node — in-pipeline agentic grounding. |
+| **Control-plane (tools / DB / memory as native nodes)** | We built a second pipeline, `whystreet-linkup.pipe`, where a RocketRide **agent** calls Linkup through the `tool_http_request` node - in-pipeline agentic grounding. |
 | **Deterministic hand-off** | Each branch returns strict tagged JSON; the backend assembles the graph from the LLM's chain (`build_graph_from_chain`) so nodes/edges are always well-formed. |
 
 ### Where Linkup and Neo4j sit
 
-RocketRide can host **both** as native pipeline nodes — Linkup via
+RocketRide can host **both** as native pipeline nodes - Linkup via
 `tool_http_request`, and the causal graph via the `db_neo4j` node
 (natural-language → Cypher). We prototyped both. In the **production path**,
 Linkup retrieval and Neo4j graph-RAG are orchestrated by the backend *around*
@@ -184,8 +184,8 @@ RocketRide's reasoning core, which gives us deterministic 2-layer retrieval,
 strict source validation, and fast, reliable graph I/O. The result is a clean
 split of responsibilities:
 
-- **RocketRide Cloud** — the parallel, provider-agnostic reasoning engine.
-- **Backend** — orchestration, Linkup grounding, Neo4j graph read/write, validation.
+- **RocketRide Cloud** - the parallel, provider-agnostic reasoning engine.
+- **Backend** - orchestration, Linkup grounding, Neo4j graph read/write, validation.
 
 ---
 
@@ -209,7 +209,7 @@ Example (NVDA, 27 Jan 2025): build-up surfaces the **Jan 6 AI-chip export rule**
 trigger surfaces **DeepSeek-R1 (Jan 27)** → chain =
 *export rule → revenue-growth fear → DeepSeek shock → Big-Tech capex fear → NVDA -17%*.
 
-`fromDate`/`toDate` (publication-date filter) is the reliable time lever — it stops
+`fromDate`/`toDate` (publication-date filter) is the reliable time lever - it stops
 Linkup from returning the same famous article for every date.
 
 ---
@@ -235,7 +235,7 @@ graph LR
 
 ## 8. The detector
 
-Pure math, no LLM — reproducible and honest.
+Pure math, no LLM - reproducible and honest.
 
 | Choice | Value | Why |
 | --- | --- | --- |
@@ -314,7 +314,7 @@ Env: `ROCKETRIDE_*` (URI/APIKEY/LLM/Linkup/Neo4j), `SUPABASE_*`, `VITE_*`.
 
 ---
 
-## 13. Future implementation — real-time, event-driven
+## 13. Future implementation - real-time, event-driven
 
 Today the pipeline is triggered by a click. The natural next step is to let the
 **market itself** trigger it, and let the knowledge graph build continuously.
@@ -329,20 +329,20 @@ flowchart LR
     GRAPH --> ALERT["Push alert:<br/>'here's why it moved'"]
 ```
 
-- **Pub/sub trigger** — the detector streams live prices; the moment it sees a significant jump it **publishes an event**, a subscriber **triggers the full pipeline automatically**, and the causal graph updates without anyone clicking. Real-time, hands-free.
-- **A living news graph** — as events keep firing, the graph keeps growing into a detailed, accurate map of *what is happening* across the market, making each new move easier to explain (recurring drivers are already in the graph).
-- **Proactive alerts** — "your stock just moved, and here is the sourced causal chain" pushed to the user the moment it happens.
-- **Deeper on RocketRide** — move Linkup and the graph fully *inside* the pipeline (agent + `tool_http_request` + `db_neo4j`), add a wave-planning agent and vector memory (`qdrant`) for semantic "similar events", and stream RocketRide's per-node traces to show the reasoning live.
-- **Scale** — expand the universe well beyond 12 tickers and support intraday moves.
+- **Pub/sub trigger** - the detector streams live prices; the moment it sees a significant jump it **publishes an event**, a subscriber **triggers the full pipeline automatically**, and the causal graph updates without anyone clicking. Real-time, hands-free.
+- **A living news graph** - as events keep firing, the graph keeps growing into a detailed, accurate map of *what is happening* across the market, making each new move easier to explain (recurring drivers are already in the graph).
+- **Proactive alerts** - "your stock just moved, and here is the sourced causal chain" pushed to the user the moment it happens.
+- **Deeper on RocketRide** - move Linkup and the graph fully *inside* the pipeline (agent + `tool_http_request` + `db_neo4j`), add a wave-planning agent and vector memory (`qdrant`) for semantic "similar events", and stream RocketRide's per-node traces to show the reasoning live.
+- **Scale** - expand the universe well beyond 12 tickers and support intraday moves.
 
 ---
 
 ## 14. Design principles
 
-- **Grounded, not generated** — no claim survives without a live Linkup source URL.
-- **Deterministic where it matters** — detection is math; the graph is assembled in code from an LLM chain, so it's always well-formed.
-- **Causality is temporal** — retrieval spans the weeks *before* a move, not just the day of.
-- **Knowledge compounds** — every analysis makes the next one smarter via the graph.
+- **Grounded, not generated** - no claim survives without a live Linkup source URL.
+- **Deterministic where it matters** - detection is math; the graph is assembled in code from an LLM chain, so it's always well-formed.
+- **Causality is temporal** - retrieval spans the weeks *before* a move, not just the day of.
+- **Knowledge compounds** - every analysis makes the next one smarter via the graph.
 
 ---
 
